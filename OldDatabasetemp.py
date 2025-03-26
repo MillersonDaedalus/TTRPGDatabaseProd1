@@ -2,7 +2,7 @@ from ZODB import FileStorage, DB
 import ObjectClasses as OC
 
 
-datastore = FileStorage.FileStorage('data.fs')
+datastore = FileStorage.FileStorage('game_data.fs')
 db = DB(datastore)
 connection = db.open()
 root = connection.root()
