@@ -12,9 +12,9 @@ from django.contrib.contenttypes.fields import GenericForeignKey, GenericRelatio
 # Core Models. Most basic attributes every creature needs to have.
 # Even Objects have Ability Scores and HP.
 class MasterAbility(models.Model):
-    ability = models.CharField(max_length=255)
-    score = models.IntegerField(default=10)
-    modifier = models.IntegerField(default=0)
+    ability = models.CharField(max_length=255, blank=True, null=True)
+    score = models.IntegerField(default=10, blank=True, null=True)
+    modifier = models.IntegerField(default=0, blank=True, null=True)
 
     class Meta:
         abstract = True
@@ -32,22 +32,20 @@ class MasterHP(models.Model):
     # Initiative.
     initiative = models.IntegerField(default=0)
 
-    # Speed.
-    speed = models.IntegerField(default=30)
 
     # Hit Points.
-    temp_hit_points = models.IntegerField(null=True)
+    temp_hit_points = models.IntegerField(blank=True, null=True)
     max_hit_points  = models.IntegerField(default=4)
     hit_points      = models.IntegerField(default=4)
-    max_hit_dice    = models.JSONField(null=True)
-    hit_dice        = models.JSONField(null=True)
+    max_hit_dice    = models.JSONField(blank=True, null=True)
+    hit_dice        = models.JSONField(blank=True, null=True)
     # Death Saves.
     death_saves_success = models.IntegerField(default=0)
     death_saves_failure = models.IntegerField(default=0)
 
     # Hidden Fields
     # Keep track of the rolls you make to increase your max hit points on level up.
-    new_hit_die_rolls = models.JSONField(null=True)
+    new_hit_die_rolls = models.JSONField(blank=True, null=True)
 
     class Meta:
         abstract = True
@@ -58,8 +56,11 @@ class MasterHP(models.Model):
 
 
 # Outlier Models and Standalone features that don't fit under another umbrella
-class Inspiration(models.Model):
+class MasterInspiration(models.Model):
     inspiration = models.BooleanField(default=False)
+
+    class Meta:
+        abstract = True
 
 ''' Depreciated, moving forward actions will be applied to items. Actions are something an item "can do", not a standalone thing.
 class MasterActions(models.Model):
@@ -98,7 +99,10 @@ class MasterActions(models.Model):
 # Base template model with common features
 class MasterModuleTemplate(models.Model):
     name = models.CharField(max_length=255)
-    description = models.TextField()
+    description = models.TextField(blank=True, null=True)
+
+    class Meta:
+        abstract = True
 
 
 # Core Minor Modules.
@@ -160,7 +164,7 @@ class MasterEquipment(MasterModuleTemplate):
         'Animal' : {
             'animal' : 'Animal',
             'tack_and_harness' : 'Tack & Harness'
-        }
+        },
         'Vehicles' : {
             'land' : 'Land',
             'water' : 'Water'
@@ -201,8 +205,8 @@ class MasterEquipment(MasterModuleTemplate):
     type = models.CharField(max_length=255, choices=TYPE_LIST)
     time_period = models.CharField(max_length=255, choices=PERIOD_LIST, blank=True, default='')
     # is_equipped = models.BooleanField(default=False) This needs moved to Player table
-    value = models.IntegerField(null=True)
-    weight = models.IntegerField(null=True)
+    value = models.IntegerField(blank= True, null=True)
+    weight = models.IntegerField(blank= True, null=True)
 
     #Armor Specific
     ac_formula = models.JSONField(blank=True, null=True)
@@ -276,7 +280,10 @@ class MasterFeatures(MasterModuleTemplate):
 
     #class related fields.
     level_requirement = models.PositiveSmallIntegerField(blank=True, null=True)
+    currency_cost = models.IntegerField(blank=True, null=True) # Cost for using this ability against the class.
 
+    class Meta:
+        abstract = True
 
 # Core Major Modules
 # Race & Background options for players TO-DO make the system more robust for monster stat blocks, check, Origin now has
@@ -333,16 +340,16 @@ class MasterOrigin(MasterModuleTemplate):
     # Used for Multiclassing where the entry needs added to the list but the first level effects are not active.
     is_primary = models.BooleanField(default=True)
 
-    proficiencies = models.TextField()  # TODO Need to fix the logic on this and tie it to the skills system
+    proficiencies = models.TextField(blank=True, null=True)  # TODO Need to fix the logic on this and tie it to the skills system
     features = GenericRelation(MasterFeatures)
     equipment = models.TextField(blank=True, null=True)  # TODO tie this in with equipment system
 
     # Race Traits
-    ability_score_increase = models.JSONField(null=True)
-    max_age = models.IntegerField(null=True)
-    alignment = models.CharField(max_length=255, choices=ALIGNMENT_LIST, default='')
-    size = models.CharField(max_length=255, choices=SIZE_LIST, default='')
-    speed = models.IntegerField(default=0)
+    ability_score_increase = models.JSONField(blank=True, null=True)
+    max_age = models.IntegerField(blank=True, null=True)
+    alignment = models.CharField(max_length=255, choices=ALIGNMENT_LIST, default='', blank=True, null=True)
+    size = models.CharField(max_length=255, choices=SIZE_LIST, default='', blank=True, null=True)
+    speed = models.IntegerField(blank=True, null=True)
 
     # Background traits
     personality_traits = models.TextField(blank=True, null=True)
@@ -353,13 +360,14 @@ class MasterOrigin(MasterModuleTemplate):
     # Class Traits
     hit_die_type = models.CharField(max_length=255, blank=True, null=True)
 
+    class Meta:
+        abstract = True
 
 class MasterClassProgression(models.Model):
     """Level-by-level class features"""
     origin = models.ForeignKey(
         'MasterOrigin',
         on_delete=models.CASCADE,
-        Limit_choices_to={'origin_type': 'class'},
         related_name='progressions'
     )
     level = models.PositiveSmallIntegerField()
@@ -367,48 +375,48 @@ class MasterClassProgression(models.Model):
     class_currency = models.JSONField() # Keep track of multiple types, including different spell-slot levels.
 
     class Meta:
+        abstract = True
         unique_together = [('origin', 'level')]
         ordering = ['level']
 
 # User Only Tables. Will Not be getting a master data table
 class MasterDescription(models.Model):
-    age     = models.CharField(max_length=255)
-    height  = models.CharField(max_length=255)
-    weight  = models.CharField(max_length=255)
-    eyes    = models.CharField(max_length=255)
-    skin    = models.CharField(max_length=255)
-    hair    = models.CharField(max_length=255)
-    appearance  = models.TextField(max_length=255)
-    appearance_photo = models.ImageField(max_length=255)
-    backstory   = models.TextField(max_length=255)
-    organization_name = models.CharField(max_length=255)
-    organization_symbol = models.ImageField(max_length=255)
-    organization_description = models.TextField(max_length=255)
+    age     = models.CharField(max_length=255, blank=True, null=True)
+    height  = models.CharField(max_length=255, blank=True, null=True)
+    weight  = models.CharField(max_length=255, blank=True, null=True)
+    eyes    = models.CharField(max_length=255, blank=True, null=True)
+    skin    = models.CharField(max_length=255, blank=True, null=True)
+    hair    = models.CharField(max_length=255, blank=True, null=True)
+    appearance  = models.TextField(max_length=255, blank=True, null=True)
+    appearance_photo = models.ImageField(blank=True, null=True)
+    backstory   = models.TextField(max_length=255, blank=True, null=True)
+    organization_name = models.CharField(max_length=255, blank=True, null=True)
+    organization_symbol = models.ImageField(blank=True, null=True)
+    organization_description = models.TextField(max_length=255, blank=True, null=True)
+
+    class Meta:
+        abstract = True
 
 class MasterThisIsYourLife(models.Model):
     pass
 
+    class Meta:
+        abstract = True
+
+# Key Class that make up the Data Tables
+class MasterData(models.Model):
+    pass
+
+
+
 # Key Class that makes up the user side tables. Includes character reference.
 class MasterUser(models.Model):
-    pass
+    character = models.ForeignKey('NPC', on_delete=models.CASCADE,)
 
-# ----------------------------------------------------------------------------------------------------------------------
+    class Meta:
+        abstract = True
 
-# User Side tables. Inherit from MasterModule + MasterUser, overwrite relationships to non-abstract tables.
-
-class NPC_Ability(MasterAbility):
-    pass
-
-class NPC_HP(MasterHP):
-    pass
-
-class NPC_Origin(MasterOrigin):
-    pass
-
-class NPC_Class_Progression(MasterClassProgression):
-    pass
-
-class NPC(models.Model):
+class MasterNPC(models.Model):
     # The only thing about the character that shouldn't change. John is still John even if he gets turned into a rabbit.
     name = models.CharField(max_length=255, default="", blank=False)
     player = models.CharField(max_length=255, default="NPC", blank=False)
@@ -428,7 +436,6 @@ class NPC(models.Model):
 
     # methods
     def get_race(self):
-        Race = self.get_attribute('race')
         pass
 
     def get_background(self):
@@ -437,5 +444,41 @@ class NPC(models.Model):
     def get_classes(self):
         pass
 
+# ----------------------------------------------------------------------------------------------------------------------
 
+# User Side tables. Inherit from MasterModule + MasterUser, overwrite relationships to non-abstract tables.
 
+class NPCAbility(MasterAbility, MasterUser):
+    pass
+
+class NPCHP(MasterHP, MasterUser):
+    pass
+
+class NPCInspiration(MasterInspiration, MasterUser):
+    pass
+
+class NPCFeatures(MasterFeatures, MasterUser):
+    pass
+
+class NPCEquipment(MasterEquipment, MasterUser):
+    pass
+
+class NPCProficiencies(MasterProficiencies, MasterUser):
+    ability = models.ForeignKey('NPCAbility', on_delete=CASCADE, blank=True, null=True)
+
+class NPCOrigin(MasterOrigin, MasterUser):
+    features = GenericRelation(NPCFeatures)
+
+class NPCClassProgression(MasterClassProgression, MasterUser):
+    origin = models.ForeignKey(
+        'NPCOrigin',
+        on_delete=models.CASCADE,
+        related_name='progressions'
+    )
+    features = GenericRelation(NPCFeatures)
+
+class NPCDescription(MasterDescription, MasterUser):
+    pass
+
+class NPC(MasterNPC):
+    pass
