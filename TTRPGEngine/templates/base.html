@@ -1,0 +1,35 @@
+{% load static %}
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}{% endblock %}</title>
+    <link rel="stylesheet" href="{% static 'style.css' %}">
+</head>
+<body>
+     <header>
+        <h1>{% block header_title %}My Website{% endblock %}</h1>
+        <nav>
+            <a href="{% url 'accounts:account_home' %}" class="button">Account</a>
+            <form method="post" style='display:inline;' action="{% url 'accounts:logout' %}">
+                {% csrf_token %}
+                <button type="submit" class="button">logout</button>
+            </form>
+            <button id="theme-toggle" class="button">Toggle Dark Mode</button>
+        </nav>
+     </header>
+
+     <!-- Main content block -->
+     {% block content %}
+     <!-- Default content can go here (optional) -->
+     {% endblock %}
+
+     <footer>
+        <p>&copy; 2023 My Website. All rights reserved.</p>
+     </footer>
+
+     <script src="{% static 'script.js' %}"></script>
+</body>
+</html>

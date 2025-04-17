@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+
+{% block title %}
+  Account
+{% endblock %}
+
+{% block header_title %}
+    Home
+{% endblock %}
+
+{% block content %}
+    <section>
+        <div class="container">
+            <div class="card">
+                <a href="{% url 'accounts:password_change' %}" class="button">Change Password</a>
+            </div>
+        </div>
+    </section>
+{% endblock %}

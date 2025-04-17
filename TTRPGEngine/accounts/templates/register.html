@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+
+{% block title %}
+  Account
+{% endblock %}
+
+{% block header_title %}
+    Home
+{% endblock %}
+
+{% block content %}
+    <section>
+        <div class="container">
+            <div class="card">
+                <h2>Sign Up</h2>
+                  <form method="post">
+                    {% csrf_token %}
+                    {{ form }}
+                    <button type="submit">Sign Up</button>
+                  </form>
+                <a href="{% url 'accounts:login' %}">Need to Log In instead?</a>
+            </div>
+        </div>
+    </section>
+{% endblock %}

@@ -1,10 +1,18 @@
+import os
+import datetime
+import zipfile
+import json
+
+from django.core.files.storage import default_storage
 from django.db import models
 from django.db.models import CASCADE
-from django.contrib.contenttypes.models import ContentType
-from django.contrib.contenttypes.fields import GenericForeignKey, GenericRelation
+from django.contrib.auth.models import User
+from django.core.exceptions import ValidationError
+from django.core.files.base import ContentFile
+
 
 """All architectures are wrong, some are useful..."""
-# Master Models
+# --------------------------------------  Master Models  ---------------------------------------------------------------
 # These models inherit down to the data models with the default data, and the character data that copies
 # from the default data
 
@@ -18,6 +26,9 @@ class MasterAbility(models.Model):
 
     class Meta:
         abstract = True
+
+    def __str__(self):
+        return self.ability
 
     def get_modifier(self, ability):
         pass
@@ -93,21 +104,23 @@ class MasterActions(models.Model):
         abstract = True
 '''
 
-# ----------------------------------------------------------------------------------------------------------------------
-
+# --------------------------------------  Template Models  -------------------------------------------------------------
 # These models are the templates that are applied to objects. Completely swappable at any time. Modular
 # Base template model with common features
-class MasterModuleTemplate(models.Model):
+class MasterTemplate(models.Model):
     name = models.CharField(max_length=255)
     description = models.TextField(blank=True, null=True)
 
     class Meta:
         abstract = True
 
+    def __str__(self):
+        return self.name
+
 
 # Core Minor Modules.
 # Inventory System.
-class MasterEquipment(MasterModuleTemplate):
+class MasterEquipment(MasterTemplate):
     """All things wearable and carriable"""
     TYPE_LIST = {
         'Adventuring Gear' : {
@@ -232,7 +245,7 @@ class MasterEquipment(MasterModuleTemplate):
 # Skills System. A lot more than just skills care about proficiencies.
 # Proficiency bonus is located in the race module.
 # TODO include logic that allows origins to populate this without duplication.
-class MasterProficiencies(MasterModuleTemplate):
+class MasterProficiencies(MasterTemplate):
     TYPE_LIST = {
         'skill' : 'Skill',
         'armor': 'Armor',
@@ -269,14 +282,11 @@ class MasterProficiencies(MasterModuleTemplate):
     def get_passive(self, name):
         pass
 
-# Container for all features from the other modules. Polymorphic relationship with other tables and feature specific
+# Container for all features from the other modules.
 # logic
-class MasterFeatures(MasterModuleTemplate):
+class MasterFeatures(MasterTemplate):
     # Name and Description Inherited from Parent
-    # Polymorphic relationship with other tables.
-    content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE)
-    object_id = models.PositiveIntegerField()
-    source = GenericForeignKey('content_type', 'object_id')
+
 
     #class related fields.
     level_requirement = models.PositiveSmallIntegerField(blank=True, null=True)
@@ -285,12 +295,15 @@ class MasterFeatures(MasterModuleTemplate):
     class Meta:
         abstract = True
 
+
+    class Meta:
+        abstract = True
 # Core Major Modules
 # Race & Background options for players TO-DO make the system more robust for monster stat blocks, check, Origin now has
 # slots for race background and class which is enough to cover almost everything for monsters
 # Races and backgrounds are pretty much just containers for skills and features. Combined together with things like
 # epic boons, and dark gifts. Added classes to that list, class progression will be in a separate table.
-class MasterOrigin(MasterModuleTemplate):
+class MasterOrigin(MasterTemplate):
     TYPE_LIST = {
         'lineage' : 'Lineage',
         'sublineage' : 'Sublineage',
@@ -341,7 +354,7 @@ class MasterOrigin(MasterModuleTemplate):
     is_primary = models.BooleanField(default=True)
 
     proficiencies = models.TextField(blank=True, null=True)  # TODO Need to fix the logic on this and tie it to the skills system
-    features = GenericRelation(MasterFeatures)
+    features = models.ManyToManyField('MasterFeature', through='MasterFeatOriginRelation')
     equipment = models.TextField(blank=True, null=True)  # TODO tie this in with equipment system
 
     # Race Traits
@@ -371,7 +384,7 @@ class MasterClassProgression(models.Model):
         related_name='progressions'
     )
     level = models.PositiveSmallIntegerField()
-    features = GenericRelation(MasterFeatures)
+    features = models.ManyToManyField('MasterFeature', through='MasterFeatOriginRelation')
     class_currency = models.JSONField() # Keep track of multiple types, including different spell-slot levels.
 
     class Meta:
@@ -403,15 +416,34 @@ class MasterThisIsYourLife(models.Model):
     class Meta:
         abstract = True
 
+# --------------------------------------  Implementation Models  -------------------------------------------------------
+# Combined with master models to make usable tables.
 # Key Class that make up the Data Tables
 class MasterData(models.Model):
-    pass
+    source = models.ForeignKey('DataSource', on_delete=CASCADE, null=True)
 
+    class Meta:
+        abstract = True
 
+class MasterSource(models.Model):
+    """Represents a source book or data pack (e.g., PHB, Xanathar's Guide)"""
+    name = models.CharField(max_length=100)
+    abbreviation = models.CharField(max_length=10)
+    description = models.TextField(blank=True)
+    publisher = models.CharField(max_length=100)
+    version = models.CharField(max_length=20)
+    release_date = models.DateField(null=True, blank=True)
+
+    class Meta:
+        abstract = True
+        ordering = ['release_date', 'name']
+
+    def __str__(self):
+        return f"{self.name} ({self.abbreviation})"
 
 # Key Class that makes up the user side tables. Includes character reference.
-class MasterUser(models.Model):
-    character = models.ForeignKey('NPC', on_delete=models.CASCADE,)
+class MasterPlayer(models.Model):
+    character = models.ForeignKey('NPC', on_delete=models.CASCADE)
 
     class Meta:
         abstract = True
@@ -421,15 +453,21 @@ class MasterNPC(models.Model):
     name = models.CharField(max_length=255, default="", blank=False)
     player = models.CharField(max_length=255, default="NPC", blank=False)
     # All other traits are defined as a foreign key relationship back to the character
-    related_names = [
-        'abilities',
-        'hitpoints',
-        'inspiration'
-        'proficiencies',
-        'inventory',
-        'features',
-        'origin'
-    ]
+    #related_names = [
+    #    'abilities',
+    #    'hitpoints',
+    #    'inspiration'
+    #    'proficiencies',
+    #    'inventory',
+    #    'features',
+    #    'origin'
+    #]
+
+    class Meta:
+        abstract = True
+
+    def __str__(self):
+        return self.name
 
     def get_attribute(self, attribute):
         pass
@@ -444,41 +482,168 @@ class MasterNPC(models.Model):
     def get_classes(self):
         pass
 
-# ----------------------------------------------------------------------------------------------------------------------
+# --------------------------------------  Relationship Tables  ---------------------------------------------------------
+#
 
-# User Side tables. Inherit from MasterModule + MasterUser, overwrite relationships to non-abstract tables.
+class MasterFeatOriginRelation(models.Model):
+    origin = models.ForeignKey('MasterOrigin', on_delete=CASCADE)
+    feature = models.ForeignKey('MasterFeatures', on_delete=CASCADE)
 
-class NPCAbility(MasterAbility, MasterUser):
+    class Meta:
+        abstract = True
+
+# -------------------------------------  Data Side Tables  -------------------------------------------------------------
+# Inherit from MasterModule + MasterData
+
+class DataAbility(MasterAbility, MasterData): # A little basic but will be used to prefill new characters.
     pass
 
-class NPCHP(MasterHP, MasterUser):
+class DataHP(MasterHP, MasterData): #Might not need this one
     pass
 
-class NPCInspiration(MasterInspiration, MasterUser):
+class DataFeatures(MasterFeatures):
     pass
 
-class NPCFeatures(MasterFeatures, MasterUser):
+#class DataFeatRelationships(MasterFeatRelationships):
+    #feature = models.ForeignKey('DataFeatures', on_delete=CASCADE)
+
+class DataEquipment(MasterEquipment, MasterData):
     pass
 
-class NPCEquipment(MasterEquipment, MasterUser):
+class DataProficiencies(MasterProficiencies, MasterData):
+    ability = models.ForeignKey('DataAbility', on_delete=CASCADE, blank=True, null=True)
+
+class DataOrigin(MasterOrigin, MasterData):
+    features = models.ManyToManyField('DataFeatures')
+
+class DataClassProgression(MasterClassProgression, MasterData):
+    origin = models.ForeignKey(
+        'DataOrigin',
+        on_delete=models.CASCADE,
+        related_name='progressions'
+    )
+    features = models.ManyToManyField('DataFeatures')
+
+class DataDescription(MasterDescription, MasterData):
     pass
 
-class NPCProficiencies(MasterProficiencies, MasterUser):
+class DataSource(MasterSource):
+    pass
+
+class UserContentProfile(models.Model):
+    """Tracks which content sources a user has activated"""
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='content_profile')
+    active_sources = models.ManyToManyField('DataSource')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"Content profile for {self.user.username}"
+
+
+def validate_lsc_extension(value):
+    if not value.name.endswith('.lsc'):
+        raise ValidationError('Only .lsc files are allowed.')
+
+
+class DataPack(models.Model):
+    """Represents an installable data fixture package"""
+    source = models.ForeignKey('DataSource', on_delete=models.CASCADE)
+    file = models.FileField(upload_to='data_packs/')
+    checksum = models.CharField(max_length=64)  # For verifying integrity
+    is_installed = models.BooleanField(default=False)
+    installed_at = models.DateTimeField(null=True, blank=True)
+    metadata = models.JSONField(default=dict, blank=True)
+
+    def __str__(self):
+        return f"Data pack for {self.source}"
+
+    def extract_to_fixtures(self):
+        """Extract LSC file to individual fixture files"""
+        if not self.file:
+            return False
+
+        try:
+            with zipfile.ZipFile(self.file.path) as z:
+                # Extract metadata if exists
+                if 'metadata.json' in z.namelist():
+                    with z.open('metadata.json') as f:
+                        self.metadata = json.load(f)
+
+                # Extract all JSON files to fixtures directory
+                for filename in z.namelist():
+                    if filename.endswith('.json'):
+                        fixture_name = os.path.basename(filename)
+                        fixture_path = os.path.join('data_packs', 'fixtures', fixture_name)
+
+                        with z.open(filename) as src_file:
+                            content = ContentFile(src_file.read())
+
+                            # Save extracted file to storage
+                            default_storage.save(fixture_path, content)
+
+            return True
+        except (zipfile.BadZipFile, json.JSONDecodeError) as e:
+            # Handle extraction errors
+            return False
+
+    def create_lsc_from_fixtures(self, fixture_files, output_path):
+        """Create an LSC file from multiple fixture files"""
+        with zipfile.ZipFile(output_path, 'w') as z:
+            # Add metadata
+            metadata = {
+                'source': self.source.name,
+                'version': self.source.version,
+                'created_at': datetime.now().isoformat()
+            }
+            z.writestr('metadata.json', json.dumps(metadata))
+
+            # Add all fixture files
+            for fixture in fixture_files:
+                z.write(fixture, os.path.basename(fixture))
+
+# --------------------------------------  User Side tables  ------------------------------------------------------------
+
+# . Inherit from MasterModule + MasterUser, overwrite relationships to non-abstract tables.
+
+class NPCAbility(MasterAbility, MasterPlayer):
+    pass
+
+class NPCHP(MasterHP, MasterPlayer):
+    pass
+
+class NPCInspiration(MasterInspiration, MasterPlayer):
+    pass
+
+class NPCFeatures(MasterFeatures):
+    pass
+
+#class NPCFeatRelationships(MasterFeatRelationships):
+    #feature = models.ForeignKey('NPCFeatures', on_delete=CASCADE)
+
+class NPCEquipment(MasterEquipment, MasterPlayer):
+    pass
+
+class NPCProficiencies(MasterProficiencies, MasterPlayer):
     ability = models.ForeignKey('NPCAbility', on_delete=CASCADE, blank=True, null=True)
 
-class NPCOrigin(MasterOrigin, MasterUser):
-    features = GenericRelation(NPCFeatures)
+class NPCOrigin(MasterOrigin, MasterPlayer):
+    features = models.ManyToManyField('NPCFeatures', through='NPCFeatOriginRelation')
 
-class NPCClassProgression(MasterClassProgression, MasterUser):
+class NPCClassProgression(MasterClassProgression, MasterPlayer):
     origin = models.ForeignKey(
         'NPCOrigin',
         on_delete=models.CASCADE,
         related_name='progressions'
     )
-    features = GenericRelation(NPCFeatures)
+    features = models.ManyToManyField('NPCFeatures')
 
-class NPCDescription(MasterDescription, MasterUser):
+class NPCDescription(MasterDescription, MasterPlayer):
     pass
 
 class NPC(MasterNPC):
     pass
+
+class NPCFeatOriginRelation(MasterFeatOriginRelation, MasterPlayer):
+    origin = models.ForeignKey('NPCOrigin', on_delete=CASCADE)
+    feature = models.ForeignKey('NPCFeatures', on_delete=CASCADE)

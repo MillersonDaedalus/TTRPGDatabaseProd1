@@ -1,0 +1,62 @@
+<!-- templates/content_manager.html -->
+{% extends "base.html" %}
+
+{% block content %}
+<h1>Content Manager</h1>
+
+<div class="row">
+    <div class="col-md-6">
+        <h2>Available Content Packs</h2>
+        <div class="list-group mb-4">
+            {% for source in installed_sources %}
+            <div class="list-group-item">
+                <h5>{{ source.name }} <small class="text-muted">{{ source.abbreviation }}</small></h5>
+                <p>{{ source.description }}</p>
+                <span class="badge {% if source.is_srd %}bg-primary{% else %}bg-secondary{% endif %}">
+                    {% if source.is_srd %}SRD{% else %}Non-SRD{% endif %}
+                </span>
+                <span class="badge bg-info">v{{ source.version }}</span>
+            </div>
+            {% empty %}
+            <div class="list-group-item">
+                No content packs installed yet.
+            </div>
+            {% endfor %}
+        </div>
+
+        <div class="card">
+            <div class="card-header">
+                Install New Content Pack
+            </div>
+            <div class="card-body">
+                <p>Upload a new content pack file:</p>
+                <form method="post" enctype="multipart/form-data">
+                    {% csrf_token %}
+                    <input type="file" name="pack_file" class="form-control mb-2">
+                    <button type="submit" class="btn btn-primary">Install</button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-6">
+        <h2>Active Content</h2>
+        <form method="post">
+            {% csrf_token %}
+            {{ form.as_p }}
+            <button type="submit" class="btn btn-primary">Save Changes</button>
+        </form>
+
+        <div class="mt-4">
+            <h4>Currently Active:</h4>
+            <ul>
+                {% for source in active_sources %}
+                <li>{{ source.name }}</li>
+                {% empty %}
+                <li>No content sources activated</li>
+                {% endfor %}
+            </ul>
+        </div>
+    </div>
+</div>
+{% endblock %}
