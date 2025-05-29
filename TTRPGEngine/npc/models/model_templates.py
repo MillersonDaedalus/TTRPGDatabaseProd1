@@ -1,5 +1,5 @@
 from django.core.files.storage import default_storage
-from rule import *
+from .rule import *
 from django.db.models import CASCADE
 
 
@@ -276,6 +276,11 @@ class MasterOrigin(MasterTemplate):
 
     class Meta:
         abstract = True
+
+    @property
+    def features(self):
+        f = MasterFeatures.objects.filter(character=self)
+        return f
 
 class MasterClassProgression(models.Model):
     """Level-by-level class features"""

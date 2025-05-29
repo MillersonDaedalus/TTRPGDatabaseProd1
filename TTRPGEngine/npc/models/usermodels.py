@@ -1,4 +1,5 @@
-from templates import *
+from .model_templates import *
+from .rule import *
 
 # --------------------------------------  User Side tables  ------------------------------------------------------------
 # Key Class that makes up the user side tables. Includes character reference.

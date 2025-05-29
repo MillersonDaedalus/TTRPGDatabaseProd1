@@ -17,11 +17,12 @@ Including another URLconf
 from django.contrib import admin
 from django.urls import path, include
 from django.views.generic.base import RedirectView
+from debug_toolbar.toolbar import debug_toolbar_urls
 
 urlpatterns = [
     path("", RedirectView.as_view(url='/npc/')),
     path('admin/', admin.site.urls),
     path('npc/', include('npc.urls')),
     path("home/", include('accounts.urls')),
-]
+] + debug_toolbar_urls()
 

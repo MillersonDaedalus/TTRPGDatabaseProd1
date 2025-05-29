@@ -1,4 +1,7 @@
-from templates import *
+from .model_templates import *
+from .rule import *
+from django.db import models
+from django.db.models import CASCADE
 import os
 import datetime
 import zipfile
